@@ -1,6 +1,6 @@
 """Research Buddy: search academic papers by topic and (optionally) get AI summaries.
 
-Sources: arXiv (always on), Crossref (always on), IEEE Xplore (only if IEEE_API_KEY is set).
+Sources: arXiv and Crossref.
 AI summaries: Google Gemini (only if GEMINI_API_KEY is set).
 Keys are read from environment variables. Never hard-code them.
 """
@@ -13,7 +13,6 @@ import streamlit as st
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-IEEE_API_KEY = os.getenv("IEEE_API_KEY")
 TIMEOUT = 15
 
 
@@ -42,22 +41,9 @@ def fetch_crossref_papers(query, max_results=5):
              "url": p.get("URL")} for p in items]
 
 
-def fetch_ieee_papers(query, max_results=5):
-    if not IEEE_API_KEY:
-        return []
-    r = requests.get("https://ieeexploreapi.ieee.org/api/v1/search/articles",
-                     params={"querytext": query, "apikey": IEEE_API_KEY,
-                             "max_records": max_results}, timeout=TIMEOUT)
-    r.raise_for_status()
-    return [{"source": "IEEE Xplore", "title": clean(p.get("title", "No title")),
-             "summary": clean(p.get("abstract")) or "No abstract available.",
-             "url": p.get("html_url") or p.get("pdf_url")} for p in r.json().get("articles", [])]
-
-
 def fetch_all_sources(query, max_results=5):
     papers, errors = [], []
-    for name, fetch in [("arXiv", fetch_arxiv_papers), ("Crossref", fetch_crossref_papers),
-                        ("IEEE Xplore", fetch_ieee_papers)]:
+    for name, fetch in [("arXiv", fetch_arxiv_papers), ("Crossref", fetch_crossref_papers)]:
         try:
             papers.extend(fetch(query, max_results))
         except Exception as exc:  # one failing source should not break the others
