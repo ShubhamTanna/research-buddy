@@ -78,7 +78,7 @@ st.title("Research Buddy")
 st.caption("Find academic papers on a topic, read the abstracts, and open the sources.")
 query = st.text_input("Research topic", placeholder="e.g. football player detection")
 n = st.slider("Results per source", 3, 10, 5)
-want_ai = st.checkbox("Add AI summaries (needs GEMINI_API_KEY)", value=bool(GEMINI_API_KEY),
+want_ai = st.checkbox("Add AI summaries", value=bool(GEMINI_API_KEY),
                       disabled=not GEMINI_API_KEY)
 
 if st.button("Search") and query.strip():
