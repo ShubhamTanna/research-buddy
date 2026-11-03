@@ -1,0 +1,3 @@
+file,alt,caption,size
+01-search.png,"Research Buddy after a search for papers on the English Premier League, showing 10 papers found with AI summaries switched on","One query searches arXiv and Crossref: 10 papers, five from each source",
+02-summary-and-abstract.png,A paper on Premier League betting odds with its two-sentence AI summary above the full abstract,"The AI summary sits above the full abstract, so you can check it against the source",
