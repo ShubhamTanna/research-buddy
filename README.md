@@ -11,13 +11,15 @@ Literature reviews for my college projects meant searching three databases separ
 - **One query, two sources:** arXiv and Crossref, merged into one list.
 - **Fails gracefully:** each source has its own timeout and error handling, so one outage still leaves results from the others, with a clear warning.
 - **Clean abstracts:** strips the JATS/XML markup Crossref returns.
-- **Optional AI summaries:** two plain-English sentences per abstract from Google Gemini (`google-genai` SDK). The prompt tells the model not to add facts.
+- **Optional AI summaries:** two plain-English sentences per abstract from Google Gemini (`google-genai` SDK). The prompt tells the model not to add facts. If the model is busy, the app retries once, falls back to a lighter model, and otherwise shows the abstracts with a single notice.
 
 ## Run it
 
 ```bash
 pip install -r requirements.txt
 export GEMINI_API_KEY=...      # optional: enables AI summaries
+export GEMINI_MODEL=...        # optional: main model (default gemini-3.8-flash)
+export GEMINI_FALLBACK_MODELS=... # optional: comma-separated models to try when the main one is busy
 streamlit run app.py
 ```
 

@@ -6,6 +6,7 @@ Keys are read from environment variables. Never hard-code them.
 """
 import os
 import re
+import time
 
 import feedparser
 import requests
@@ -13,6 +14,8 @@ import streamlit as st
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+# Tried in order if the main model is busy or unavailable (comma-separated in the secret)
+GEMINI_FALLBACK_MODELS = [m.strip() for m in os.getenv("GEMINI_FALLBACK_MODELS", "gemini-3.5-flash-lite").split(",") if m.strip()]
 TIMEOUT = 15
 
 
@@ -51,13 +54,29 @@ def fetch_all_sources(query, max_results=5):
     return papers, errors
 
 
-def summarize(abstract):
-    """Two-sentence plain-English summary of an abstract, via Gemini (google-genai SDK)."""
+def summarize(abstract, models):
+    """Two-sentence plain-English summary of an abstract, via Gemini (google-genai SDK).
+
+    Tries each model in order; a busy model (503/429) gets one quick retry before moving on.
+    Returns (summary, model_used). Raises the last error if every model fails.
+    """
     from google import genai
     client = genai.Client(api_key=GEMINI_API_KEY)
     prompt = ("Summarise this research abstract in two plain-English sentences for a "
               "student deciding whether to read the paper. Do not add facts.\n\n" + abstract)
-    return client.models.generate_content(model=GEMINI_MODEL, contents=prompt).text
+    last_error = None
+    for model in models:
+        for attempt in range(2):
+            try:
+                return client.models.generate_content(model=model, contents=prompt).text, model
+            except Exception as exc:  # busy, retired or unknown model: try the next one
+                last_error = exc
+                busy = any(code in str(exc) for code in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED"))
+                if busy and attempt == 0:
+                    time.sleep(2)
+                    continue
+                break
+    raise last_error
 
 
 st.title("Research Buddy")
@@ -73,14 +92,20 @@ if st.button("Search") and query.strip():
     for e in errors:
         st.warning(e)
     st.write(f"**{len(papers)} papers found**")
+    models = [GEMINI_MODEL] + [m for m in GEMINI_FALLBACK_MODELS if m != GEMINI_MODEL]
+    ai_available = True
     for p in papers:
         st.subheader(p["title"])
         st.caption(p["source"])
-        if want_ai and p["summary"] != "No abstract available.":
+        if want_ai and ai_available and p["summary"] != "No abstract available.":
             try:
-                st.info(summarize(p["summary"]))
-            except Exception as exc:
-                st.caption(f"AI summary unavailable: {exc}")
+                text, used = summarize(p["summary"], models)
+                models = [used] + [m for m in models if m != used]  # keep using what worked
+                st.info(text)
+            except Exception:
+                ai_available = False  # don't keep retrying for every paper
+                st.warning("AI summaries are unavailable right now (Google's model is busy). "
+                           "The abstracts are below; try again in a few minutes.")
         with st.expander("Abstract"):
             st.write(p["summary"])
         if p.get("url"):
